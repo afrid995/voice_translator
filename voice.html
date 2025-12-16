@@ -1,0 +1,1841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TrekTalk Mini - Voice Translate Prototype</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    /* =========================
+       Background & Global
+       ========================= */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1b2838 0%, #020308 45%, #000000 100%);
+      color: #f5f7fb;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* =========================
+       Device Shell & 3D Look
+       ========================= */
+    .device-wrapper {
+      animation: deviceFadeIn 0.9s ease-out forwards;
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    @keyframes deviceFadeIn {
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .device {
+      position: relative;
+      width: 360px;
+      max-width: 90vw;
+      height: 640px;
+      max-height: 90vh;
+      background: linear-gradient(145deg, #0b1625, #050a14);
+      border-radius: 38px;
+      box-shadow:
+        0 28px 60px rgba(0, 0, 0, 0.9),
+        inset 0 0 0 2px rgba(255, 255, 255, 0.02);
+      padding: 18px 20px 70px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      justify-content: flex-start;
+      color: #f5f7fb;
+      overflow: visible;
+    }
+    .device::before,
+    .device::after {
+      content: "";
+      position: absolute;
+      left: 12%;
+      width: 76%;
+      height: 10px;
+      border-radius: 100px;
+      background: linear-gradient(to bottom, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.4));
+      filter: blur(1px);
+      pointer-events: none;
+    }
+    .device::before {
+      top: 6px;
+    }
+    .device::after {
+      bottom: 6px;
+      background: linear-gradient(to top, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.4));
+    }
+
+    .screw {
+      position: absolute;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #dde2f3 0%, #80889a 40%, #313948 100%);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.75), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+    }
+    .screw::before {
+      content: "";
+      position: absolute;
+      left: 2px;
+      right: 2px;
+      top: 50%;
+      height: 1px;
+      background: rgba(0, 0, 0, 0.6);
+    }
+    .screw.tl { top: 20px; left: 22px; }
+    .screw.tr { top: 20px; right: 22px; }
+    .screw.bl { bottom: 76px; left: 22px; }
+    .screw.br { bottom: 76px; right: 22px; }
+
+    /* =========================
+       Top Edge SOS Button / LED
+       ========================= */
+    .top-edge {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sos-top-button {
+      width: 56px;
+      height: 16px;
+      border-radius: 999px;
+      background: linear-gradient(145deg, #ff6b3d, #b22222);
+      box-shadow:
+        0 3px 6px rgba(0, 0, 0, 0.6),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #fffbe8;
+      cursor: pointer;
+      user-select: none;
+    }
+    .sos-top-button:active {
+      transform: translateY(1px);
+      box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.9),
+        inset 0 0 4px rgba(0, 0, 0, 0.8);
+    }
+
+    .led-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #7cff96 0%, #2ecc40 45%, #0f3b12 100%);
+      box-shadow: 0 0 9px rgba(46, 204, 64, 0.9);
+      transition: background 0.25s ease, box-shadow 0.25s ease;
+    }
+    .led-green {
+      background: radial-gradient(circle at 30% 30%, #7cff96 0%, #2ecc40 45%, #0f3b12 100%);
+      box-shadow: 0 0 9px rgba(46, 204, 64, 0.9);
+    }
+    .led-blue {
+      background: radial-gradient(circle at 30% 30%, #a6e0ff 0%, #29b6f6 45%, #0a2741 100%);
+      box-shadow: 0 0 9px rgba(41, 182, 246, 0.9);
+    }
+    .led-red {
+      background: radial-gradient(circle at 30% 30%, #ffb3b3 0%, #ff3b3b 45%, #430808 100%);
+      box-shadow: 0 0 9px rgba(255, 59, 59, 0.9);
+    }
+
+    /* =========================
+       Side Hardware Buttons
+       ========================= */
+    .side-buttons-left,
+    .side-buttons-right {
+      position: absolute;
+      top: 140px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .side-buttons-left {
+      left: -12px;
+      align-items: flex-start;
+    }
+    .side-buttons-right {
+      right: -12px;
+      align-items: flex-end;
+    }
+    .volume-btn {
+      width: 10px;
+      height: 40px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #667384, #141821);
+      box-shadow:
+        0 2px 5px rgba(0, 0, 0, 0.7),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+      cursor: pointer;
+    }
+    .volume-btn:active {
+      transform: translateX(1px);
+    }
+    .power-btn {
+      width: 10px;
+      height: 48px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #ff6666, #6b1111);
+      box-shadow:
+        0 2px 5px rgba(0, 0, 0, 0.9),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+    }
+    .power-btn:active {
+      transform: translateX(-1px);
+    }
+
+    /* =========================
+       Screen & Tabs
+       ========================= */
+    .screen {
+      flex: 1;
+      margin-top: 32px;
+      border-radius: 24px;
+      background: radial-gradient(circle at top, #222832 0%, #10141c 55%, #06060a 100%);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+        inset 0 18px 36px rgba(255, 255, 255, 0.05),
+        inset 0 -18px 36px rgba(0, 0, 0, 0.8);
+      padding: 12px 14px 14px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #dfe7ff;
+      margin-bottom: 10px;
+    }
+    .status-left,
+    .status-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-center {
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 10px;
+      color: #90c9ff;
+    }
+    .badge-offline {
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(255, 163, 26, 0.15);
+      border: 1px solid rgba(255, 197, 94, 0.6);
+      color: #ffd37a;
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .icon-gps {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 1px solid #6bd6ff;
+      position: relative;
+    }
+    .icon-gps::after {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      border: 1px solid #6bd6ff;
+    }
+    .battery {
+      width: 20px;
+      height: 10px;
+      border-radius: 2px;
+      border: 1px solid #cfd6e5;
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding: 1px;
+    }
+    .battery::after {
+      content: "";
+      position: absolute;
+      right: -3px;
+      top: 2px;
+      width: 2px;
+      height: 6px;
+      border-radius: 1px;
+      background: #cfd6e5;
+    }
+    .battery-level {
+      flex: 1;
+      height: 100%;
+      border-radius: 1px;
+      background: linear-gradient(90deg, #15d33f, #a3f16b);
+    }
+
+    .tabs-header {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+      font-size: 11px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 6px 4px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.65));
+      color: #b7c5dd;
+      cursor: pointer;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease, transform 0.1s ease;
+    }
+    .tab-btn:hover {
+      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.7));
+    }
+    .tab-btn.active {
+      background: linear-gradient(135deg, #3a8dff, #66e0ff);
+      color: #05111f;
+      border-color: rgba(255, 255, 255, 0.6);
+      box-shadow: 0 0 10px rgba(70, 156, 255, 0.7);
+    }
+    .tab-btn:active {
+      transform: translateY(1px);
+    }
+
+    .tabs-content {
+      position: relative;
+      flex: 1;
+      border-radius: 18px;
+      background: radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 55%);
+      padding: 10px 10px 8px;
+      overflow: hidden;
+    }
+    .tab-panel {
+      position: absolute;
+      inset: 0;
+      padding: 4px 0 2px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(10px);
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(135, 150, 184, 0.6) transparent;
+    }
+    .tab-panel.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+    .tab-panel::-webkit-scrollbar {
+      width: 4px;
+    }
+    .tab-panel::-webkit-scrollbar-thumb {
+      background: rgba(135, 150, 184, 0.6);
+      border-radius: 999px;
+    }
+
+    /* =========================
+       Translate Tab
+       ========================= */
+    .translate-header {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    .lang-select-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 11px;
+      color: #8f9bb7;
+    }
+    .lang-label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 9px;
+    }
+    .lang-select {
+      width: 100%;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.8));
+      color: #e3e8fc;
+      font-size: 11px;
+      outline: none;
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, #9eacd0 50%), linear-gradient(135deg, #9eacd0 50%, transparent 50%);
+      background-position: calc(100% - 11px) 9px, calc(100% - 7px) 9px;
+      background-size: 4px 4px, 4px 4px;
+      background-repeat: no-repeat;
+    }
+    .lang-select:focus {
+      border-color: rgba(90, 186, 255, 0.9);
+      box-shadow: 0 0 0 1px rgba(90, 186, 255, 0.45);
+    }
+    .swap-langs-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 13px;
+      color: #d7e6ff;
+      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.85));
+      box-shadow: 0 0 10px rgba(126, 182, 255, 0.4);
+    }
+    .swap-langs-btn:active {
+      transform: scale(0.94);
+    }
+
+    .mic-section {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+    .mic-button {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 20%, #ffffff, #82c0ff 30%, #3576ff 60%, #0a2255 100%);
+      box-shadow:
+        0 12px 25px rgba(0, 0, 0, 0.9),
+        0 0 18px rgba(89, 169, 255, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }
+    .mic-button::after {
+      content: "";
+      position: absolute;
+      inset: 7px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.7);
+    }
+    .mic-icon {
+      width: 22px;
+      height: 30px;
+      border-radius: 11px 11px 8px 8px;
+      border: 2px solid #0b2140;
+      background: linear-gradient(180deg, #fdfdff, #d0e3ff);
+      position: relative;
+    }
+    .mic-icon::before {
+      content: "";
+      position: absolute;
+      bottom: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 14px;
+      height: 10px;
+      border-radius: 0 0 10px 10px;
+      border: 2px solid #0b2140;
+      border-top: none;
+    }
+    .mic-icon::after {
+      content: "";
+      position: absolute;
+      bottom: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 2px;
+      height: 6px;
+      background: #0b2140;
+    }
+    .mic-button:active {
+      transform: translateY(2px) scale(0.97);
+      box-shadow:
+        0 6px 15px rgba(0, 0, 0, 0.9),
+        0 0 8px rgba(89, 169, 255, 0.7);
+    }
+    .mic-button.listening {
+      animation: micPulse 1.2s ease-in-out infinite;
+    }
+    @keyframes micPulse {
+      0%, 100% {
+        box-shadow:
+          0 12px 25px rgba(0, 0, 0, 0.9),
+          0 0 15px rgba(69, 179, 255, 0.8),
+          0 0 25px rgba(69, 179, 255, 0.4);
+      }
+      50% {
+        box-shadow:
+          0 15px 29px rgba(0, 0, 0, 1),
+          0 0 22px rgba(69, 179, 255, 1),
+          0 0 35px rgba(69, 179, 255, 0.8);
+      }
+    }
+
+    .text-areas {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .text-block {
+      border-radius: 12px;
+      padding: 6px 8px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.7));
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-height: 60px;
+    }
+    .text-block-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #9aa4c0;
+    }
+    .text-block-title {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .play-btn {
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      padding: 2px 7px;
+      font-size: 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.9));
+      color: #d6e2ff;
+    }
+    .play-btn span {
+      font-size: 9px;
+    }
+    .text-block-body {
+      font-size: 12px;
+      color: #e4e9fd;
+      margin-top: 2px;
+      word-break: break-word;
+    }
+    .text-placeholder {
+      color: #626b83;
+      font-style: italic;
+    }
+
+    .status-text {
+      font-size: 9px;
+      color: #91a0c8;
+      margin-top: 4px;
+      min-height: 12px;
+    }
+
+    /* =========================
+       Map Tab
+       ========================= */
+    .map-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      gap: 6px;
+    }
+    .map-header {
+      font-size: 11px;
+      color: #b7c5dd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .map-note {
+      font-size: 9px;
+      color: #8c97b1;
+      max-width: 60%;
+      text-align: right;
+    }
+    .map-viewport {
+      flex: 1;
+      border-radius: 14px;
+      background: radial-gradient(circle at top, #1d2e23 0%, #050806 60%, #020403 100%);
+      border: 1px solid rgba(91, 135, 113, 0.6);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .map-content {
+      position: relative;
+      width: 200px;
+      height: 200px;
+      transform-origin: 50% 50%;
+      transition: transform 0.2s ease;
+    }
+    /* Soft contour lines */
+    .contour-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px dashed rgba(211, 239, 210, 0.18);
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+    }
+    .contour-ring.r1 {
+      width: 170px;
+      height: 170px;
+      top: 12px;
+      left: 12px;
+    }
+    .contour-ring.r2 {
+      width: 130px;
+      height: 130px;
+      top: 32px;
+      left: 32px;
+    }
+    .contour-ring.r3 {
+      width: 90px;
+      height: 90px;
+      top: 52px;
+      left: 52px;
+    }
+    .mountain {
+      position: absolute;
+      border-bottom: 40px solid #385944;
+      border-left: 30px solid transparent;
+      border-right: 30px solid transparent;
+      bottom: 10px;
+      filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.6));
+    }
+    .mountain.m1 { left: 0px; opacity: 0.95; }
+    .mountain.m2 { left: 46px; border-bottom-color: #4d7a57; }
+    .mountain.m3 { left: 92px; border-bottom-color: #314934; opacity: 0.8; }
+    .trail-line {
+      position: absolute;
+      width: 2px;
+      height: 120px;
+      background: linear-gradient(180deg, #ffd169, #ff934f);
+      left: 50%;
+      transform: translateX(-50%) rotate(24deg);
+      top: 30px;
+      box-shadow: 0 0 4px rgba(255, 190, 92, 0.9);
+    }
+    .you-are-here {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #fff, #ff4141 60%, #4b0404 100%);
+      left: 56%;
+      top: 70px;
+      box-shadow: 0 0 8px rgba(255, 65, 65, 0.9);
+    }
+    .you-are-here::after {
+      content: "You are\nhere";
+      white-space: pre;
+      font-size: 8px;
+      color: #fcefef;
+      position: absolute;
+      left: 14px;
+      top: -16px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    }
+    /* River / stream */
+    .river {
+      position: absolute;
+      width: 4px;
+      height: 170px;
+      left: 26px;
+      top: 10px;
+      background: linear-gradient(180deg, #7fd4ff, #3aa5ff, #0d4a74);
+      border-radius: 16px;
+      box-shadow: 0 0 8px rgba(99, 195, 255, 0.9);
+      transform: rotate(-18deg);
+      opacity: 0.9;
+    }
+    .river::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.45);
+      opacity: 0.7;
+    }
+    /* Forest patches */
+    .forest {
+      position: absolute;
+      width: 60px;
+      height: 40px;
+      border-radius: 40px;
+      background: radial-gradient(circle at 30% 20%, #b8ffb5, #3e7b3c 55%, #102612 100%);
+      opacity: 0.8;
+      filter: blur(0.2px);
+      box-shadow: 0 4px 7px rgba(0, 0, 0, 0.8);
+    }
+    .forest.f1 { top: 26px; right: 16px; }
+    .forest.f2 { bottom: 22px; left: 40px; transform: scale(0.9); }
+    .forest.f3 { bottom: 40px; right: 34px; transform: scale(0.8); }
+    /* Camps / POIs */
+    .poi {
+      position: absolute;
+      font-size: 8px;
+      color: #f4f8ff;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+    }
+    .poi::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 2px;
+      margin-right: 3px;
+      background: radial-gradient(circle at 30% 30%, #fff, #ffcf4b 55%, #6b3d09 100%);
+      box-shadow: 0 0 4px rgba(255, 207, 75, 0.9);
+      vertical-align: middle;
+    }
+    .poi.base {
+      left: 60px;
+      bottom: 16px;
+    }
+    .poi.mid {
+      left: 104px;
+      bottom: 70px;
+    }
+    .poi.summit {
+      left: 86px;
+      top: 18px;
+    }
+    .map-controls {
+      display: flex;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .map-btn {
+      flex: 1;
+      padding: 4px 0;
+      border-radius: 999px;
+      border: 1px solid rgba(175, 214, 190, 0.75);
+      background: radial-gradient(circle at top, rgba(224, 255, 234, 0.07), rgba(6, 17, 11, 0.9));
+      color: #d0ffe0;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .map-btn:active {
+      transform: translateY(1px);
+    }
+    .map-legend-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 4px;
+      font-size: 9px;
+      color: #a8cbb0;
+    }
+    .compass {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 1px solid rgba(197, 226, 209, 0.8);
+      font-size: 9px;
+      color: #e9fff1;
+      position: relative;
+    }
+    .compass::after {
+      content: "";
+      position: absolute;
+      width: 2px;
+      height: 12px;
+      border-radius: 999px;
+      background: linear-gradient(to bottom, #ff5555 0%, #4a0c0c 100%);
+    }
+    .map-scale {
+      font-size: 8px;
+      color: #b7dec4;
+    }
+
+    /* =========================
+       Safety Tab
+       ========================= */
+    .safety-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      gap: 8px;
+    }
+    .safety-header {
+      font-size: 11px;
+      color: #ffb9b9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .safety-note {
+      font-size: 9px;
+      color: #ffdddd;
+      text-align: right;
+      max-width: 55%;
+    }
+    .sos-main-btn {
+      margin: 0 auto;
+      margin-top: 6px;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 20%, #ffe5e5, #ff3a3a 55%, #5e0505 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #fff6f6;
+      cursor: pointer;
+      box-shadow:
+        0 18px 45px rgba(0, 0, 0, 0.9),
+        0 0 22px rgba(255, 46, 46, 0.95);
+      animation: sosPulse 1.4s ease-in-out infinite;
+      border: 3px solid rgba(255, 241, 241, 0.9);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+    }
+    @keyframes sosPulse {
+      0%, 100% {
+        transform: scale(1);
+        box-shadow:
+          0 18px 45px rgba(0, 0, 0, 0.9),
+          0 0 16px rgba(255, 46, 46, 0.9),
+          0 0 30px rgba(255, 46, 46, 0.6);
+      }
+      50% {
+        transform: scale(1.04);
+        box-shadow:
+          0 20px 50px rgba(0, 0, 0, 1),
+          0 0 24px rgba(255, 76, 76, 1),
+          0 0 40px rgba(255, 76, 76, 0.9);
+      }
+    }
+    .safety-presets {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #ffc8c8;
+    }
+    .preset-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .preset-item {
+      padding: 4px 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 180, 180, 0.65);
+      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.04), rgba(55, 8, 8, 0.9));
+      cursor: pointer;
+      font-size: 10px;
+      color: #ffecec;
+    }
+    .preset-item:hover {
+      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.08), rgba(78, 12, 12, 0.9));
+    }
+    .preset-display {
+      margin-top: 5px;
+      font-size: 11px;
+      color: #ffdddd;
+      min-height: 16px;
+    }
+
+    .safety-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.84);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 4;
+    }
+    .safety-modal-backdrop.active {
+      display: flex;
+    }
+    .safety-modal {
+      width: 86%;
+      border-radius: 14px;
+      padding: 10px 12px;
+      background: linear-gradient(145deg, #2a1111, #080102);
+      border: 1px solid rgba(255, 132, 132, 0.8);
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.95);
+      font-size: 11px;
+      color: #ffe5e5;
+    }
+    .safety-modal-title {
+      font-weight: 600;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+    .safety-modal-body {
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+    .safety-modal-close {
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.16), rgba(63, 23, 23, 0.9));
+      border: 1px solid rgba(255, 183, 183, 0.8);
+      color: #ffecec;
+      font-size: 11px;
+      cursor: pointer;
+      float: right;
+    }
+
+    /* =========================
+       Settings Tab
+       ========================= */
+    .settings-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 11px;
+      color: #c3d3ff;
+    }
+    .settings-group {
+      padding: 6px 8px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.75));
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .settings-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a6d5;
+    }
+    .settings-select {
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.02), rgba(3, 6, 20, 0.95));
+      color: #e1e7ff;
+      font-size: 11px;
+      outline: none;
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, #a3b5e0 50%), linear-gradient(135deg, #a3b5e0 50%, transparent 50%);
+      background-position: calc(100% - 11px) 9px, calc(100% - 7px) 9px;
+      background-size: 4px 4px, 4px 4px;
+      background-repeat: no-repeat;
+    }
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .settings-units {
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.02), rgba(3, 6, 20, 0.95));
+      color: #e1e7ff;
+      font-size: 11px;
+    }
+
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 20px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #1a1d29, #050509);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .toggle-switch {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 20%, #ffffff, #c7d4ff);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.7);
+      transition: transform 0.18s ease;
+    }
+    .toggle.on {
+      background: linear-gradient(135deg, #2ea64f, #163520);
+      border-color: rgba(125, 255, 167, 0.9);
+    }
+    .toggle.on .toggle-switch {
+      transform: translateX(18px);
+    }
+
+    /* =========================
+       Hardware Bottom Buttons
+       ========================= */
+    .bottom-buttons {
+      position: absolute;
+      bottom: 14px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      font-size: 11px;
+      color: #c4d0ea;
+    }
+    .hw-btn {
+      width: 70px;
+      height: 26px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.08), rgba(1, 1, 5, 0.95));
+      box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.8),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
+    }
+    .hw-btn:active {
+      transform: translateY(1px);
+      box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.9),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+      background: radial-gradient(circle at top, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.95));
+    }
+
+    /* =========================
+       Toast
+       ========================= */
+    .toast {
+      position: absolute;
+      left: 50%;
+      bottom: 48px;
+      transform: translateX(-50%) translateY(40px);
+      min-width: 180px;
+      max-width: 260px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(4, 9, 22, 0.95);
+      border: 1px solid rgba(163, 189, 255, 0.7);
+      color: #e7efff;
+      font-size: 11px;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.9);
+      transition: opacity 0.26s ease, transform 0.26s ease;
+      z-index: 5;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* =========================
+       Disclaimer
+       ========================= */
+    .disclaimer {
+      margin-top: 6px;
+      font-size: 9px;
+      color: #8994b3;
+      line-height: 1.4;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="device-wrapper">
+    <div class="device">
+      <!-- Screws -->
+      <div class="screw tl"></div>
+      <div class="screw tr"></div>
+      <div class="screw bl"></div>
+      <div class="screw br"></div>
+
+      <!-- Top Edge Elements -->
+      <div class="top-edge">
+        <div class="sos-top-button" id="sosTopBtn">SOS</div>
+        <div class="led-indicator led-green" id="statusLed"></div>
+      </div>
+
+      <!-- Side Buttons -->
+      <div class="side-buttons-left">
+        <div class="volume-btn" id="volUpBtn" title="Volume +"></div>
+        <div class="volume-btn" id="volDownBtn" title="Volume -"></div>
+      </div>
+      <div class="side-buttons-right">
+        <div class="power-btn" id="powerBtn" title="Power"></div>
+      </div>
+
+      <!-- Screen -->
+      <div class="screen">
+        <!-- Status bar -->
+        <div class="status-bar">
+          <div class="status-left">
+            <span id="timeDisplay">12:34</span>
+            <div class="icon-gps" title="GPS (simulated)"></div>
+          </div>
+          <div class="status-center">TrekTalk Mini</div>
+          <div class="status-right">
+            <span class="badge-offline">OFFLINE</span>
+            <div class="battery" title="Battery (simulated)">
+              <div class="battery-level"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs header -->
+        <div class="tabs-header">
+          <button class="tab-btn active" data-tab="translate">Translate</button>
+          <button class="tab-btn" data-tab="map">Map</button>
+          <button class="tab-btn" data-tab="safety">Safety</button>
+          <button class="tab-btn" data-tab="settings">Settings</button>
+        </div>
+
+        <!-- Tabs content -->
+        <div class="tabs-content">
+          <!-- Translate Tab -->
+          <div class="tab-panel active" id="tab-translate">
+            <div class="translate-header">
+              <div class="lang-select-group">
+                <div class="lang-label">Source</div>
+                <select id="sourceLang" class="lang-select">
+                  <option>English</option>
+                  <option>Hindi</option>
+                  <option>Bengali</option>
+                  <option>Urdu</option>
+                  <option>Tamil</option>
+                  <option>Telugu</option>
+                  <option>Kannada</option>
+                  <option>Marathi</option>
+                  <option>Gujarati</option>
+                  <option>Malayalam</option>
+                  <option>Nepali</option>
+                </select>
+              </div>
+              <button class="swap-langs-btn" id="swapLangsBtn" title="Swap languages">⇄</button>
+              <div class="lang-select-group">
+                <div class="lang-label">Target</div>
+                <select id="targetLang" class="lang-select">
+                  <option>Hindi</option>
+                  <option>English</option>
+                  <option>Bengali</option>
+                  <option>Urdu</option>
+                  <option>Tamil</option>
+                  <option>Telugu</option>
+                  <option>Kannada</option>
+                  <option>Marathi</option>
+                  <option>Gujarati</option>
+                  <option>Malayalam</option>
+                  <option>Nepali</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mic-section">
+              <div class="mic-button" id="micButton" title="Tap to speak">
+                <div class="mic-icon"></div>
+              </div>
+            </div>
+
+            <div class="text-areas">
+              <div class="text-block">
+                <div class="text-block-header">
+                  <span class="text-block-title">You said</span>
+                  <button class="play-btn" id="playSourceBtn">
+                    ▶ <span>Play</span>
+                  </button>
+                </div>
+                <div class="text-block-body" id="sourceText">
+                  <span class="text-placeholder">Tap the mic to speak, or type after prompt appears (if mic unsupported).</span>
+                </div>
+              </div>
+
+              <div class="text-block">
+                <div class="text-block-header">
+                  <span class="text-block-title">Translated</span>
+                  <button class="play-btn" id="playTargetBtn">
+                    ▶ <span>Play</span>
+                  </button>
+                </div>
+                <div class="text-block-body" id="translatedText">
+                  <span class="text-placeholder">Translation will appear here using your local self‑hosted server.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="status-text" id="translateStatus"></div>
+          </div>
+
+          <!-- Map Tab -->
+          <div class="tab-panel" id="tab-map">
+            <div class="map-container">
+              <div class="map-header">
+                <span>Ridge Trail · 3,250m (simulated)</span>
+                <span class="map-note">Static trek-style mock map. No real GPS or live routing.</span>
+              </div>
+              <div class="map-viewport">
+                <div class="map-content" id="mapContent">
+                  <div class="contour-ring r1"></div>
+                  <div class="contour-ring r2"></div>
+                  <div class="contour-ring r3"></div>
+                  <div class="river"></div>
+                  <div class="mountain m1"></div>
+                  <div class="mountain m2"></div>
+                  <div class="mountain m3"></div>
+                  <div class="trail-line"></div>
+                  <div class="you-are-here"></div>
+                  <div class="forest f1"></div>
+                  <div class="forest f2"></div>
+                  <div class="forest f3"></div>
+                  <div class="poi base">Base Camp · 2,800m</div>
+                  <div class="poi mid">Ridge Camp · 3,050m</div>
+                  <div class="poi summit">Summit View · 3,250m</div>
+                </div>
+              </div>
+              <div class="map-controls">
+                <button class="map-btn" id="zoomInBtn">Zoom In</button>
+                <button class="map-btn" id="zoomOutBtn">Zoom Out</button>
+              </div>
+              <div class="map-legend-row">
+                <span class="map-scale">Scale: ~200m across</span>
+                <div class="compass">N</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Safety Tab -->
+          <div class="tab-panel" id="tab-safety">
+            <div class="safety-container">
+              <div class="safety-header">
+                <span>Safety &amp; SOS (demo)</span>
+                <span class="safety-note">No real emergency messages are sent. Visual only.</span>
+              </div>
+              <button class="sos-main-btn" id="sosMainBtn">SOS</button>
+              <div class="safety-presets">
+                Preset messages:
+                <div class="preset-list">
+                  <button class="preset-item" data-msg="Need help">Need help</button>
+                  <button class="preset-item" data-msg="Medical emergency">Medical emergency</button>
+                  <button class="preset-item" data-msg="Lost but safe">Lost but safe</button>
+                </div>
+                <div class="preset-display" id="presetDisplay"></div>
+              </div>
+            </div>
+
+            <!-- Safety Modal -->
+            <div class="safety-modal-backdrop" id="safetyModal">
+              <div class="safety-modal">
+                <div class="safety-modal-title">SOS Demo Only</div>
+                <div class="safety-modal-body">
+                  This TrekTalk Mini prototype does <strong>not</strong> send any real emergency messages or contact rescue services.
+                  It is for UI, translation, and safety workflow simulation only.
+                </div>
+                <button class="safety-modal-close" id="safetyModalClose">Close</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Settings Tab -->
+          <div class="tab-panel" id="tab-settings">
+            <div class="settings-container">
+              <div class="settings-group">
+                <div class="settings-label">UI Language (simulated)</div>
+                <select id="uiLangSelect" class="settings-select">
+                  <option value="en">English</option>
+                  <option value="hi">Hindi</option>
+                  <option value="bn">Bengali</option>
+                  <option value="ta">Tamil</option>
+                  <option value="te">Telugu</option>
+                  <option value="kn">Kannada</option>
+                  <option value="mr">Marathi</option>
+                  <option value="gu">Gujarati</option>
+                  <option value="ml">Malayalam</option>
+                  <option value="ne">Nepali</option>
+                </select>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-label">Units</div>
+                <div class="settings-row">
+                  <span>Preferred distance units</span>
+                  <select id="unitsSelect" class="settings-units">
+                    <option value="km">Kilometers</option>
+                    <option value="mi">Miles</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-label">Battery Saver</div>
+                <div class="settings-row">
+                  <span>Battery saver mode</span>
+                  <div class="toggle" id="batteryToggle">
+                    <div class="toggle-switch"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="status-text">
+                Use the hardware OK button while on this tab to save settings (local state only, no persistence).
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hardware Bottom Buttons -->
+      <div class="bottom-buttons">
+        <div class="hw-btn" id="homeBtn">Home</div>
+        <div class="hw-btn" id="backBtn">Back</div>
+        <div class="hw-btn" id="okBtn">OK</div>
+      </div>
+
+      <!-- Toast -->
+      <div class="toast" id="toast"></div>
+
+      <!-- Disclaimer -->
+      <div class="disclaimer">
+        Prototype TrekTalk Mini UI. Voice recognition and TTS run in your browser. Translation uses a local self-hosted
+        API (e.g., LibreTranslate on localhost) with no external billing. No real emergency messages are sent.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================
+    // Language Mappings
+    // =========================
+    const languageCodeMap = {
+      "English": "en",
+      "Hindi": "hi",
+      "Bengali": "bn",
+      "Urdu": "ur",
+      "Tamil": "ta",
+      "Telugu": "te",
+      "Kannada": "kn",
+      "Marathi": "mr",
+      "Gujarati": "gu",
+      "Malayalam": "ml",
+      "Nepali": "ne"
+    };
+
+    const languageLocaleMap = {
+      "English": "en-IN",
+      "Hindi": "hi-IN",
+      "Bengali": "bn-IN",
+      "Urdu": "ur-IN",
+      "Tamil": "ta-IN",
+      "Telugu": "te-IN",
+      "Kannada": "kn-IN",
+      "Marathi": "mr-IN",
+      "Gujarati": "gu-IN",
+      "Malayalam": "ml-IN",
+      "Nepali": "ne-NP"
+    };
+
+    // Languages that are actually installed on the local LibreTranslate server
+    // (based on your current Argos models: en, hi, bn, ur)
+    const installedLanguageCodes = new Set(["en", "hi", "bn", "ur"]);
+
+    // =========================
+    // State
+    // =========================
+    let currentTab = "translate";
+    let lastTab = "translate";
+    let toastTimeout = null;
+    let recognition = null;
+    let recognitionSupported = false;
+    let recognitionListening = false;
+    let recognitionHadResult = false;
+    let currentSourceText = "";
+    let currentTranslatedText = "";
+    let mapScale = 1;
+    let settingsState = {
+      uiLang: "en",
+      units: "km",
+      batterySaver: false
+    };
+
+    // =========================
+    // DOM References
+    // =========================
+    const tabs = document.querySelectorAll(".tab-btn");
+    const panels = document.querySelectorAll(".tab-panel");
+    const statusLed = document.getElementById("statusLed");
+    const toastEl = document.getElementById("toast");
+    const timeDisplay = document.getElementById("timeDisplay");
+
+    const sourceLangSelect = document.getElementById("sourceLang");
+    const targetLangSelect = document.getElementById("targetLang");
+    const swapLangsBtn = document.getElementById("swapLangsBtn");
+    const micButton = document.getElementById("micButton");
+    const translateStatus = document.getElementById("translateStatus");
+    const sourceTextEl = document.getElementById("sourceText");
+    const translatedTextEl = document.getElementById("translatedText");
+    const playSourceBtn = document.getElementById("playSourceBtn");
+    const playTargetBtn = document.getElementById("playTargetBtn");
+
+    const mapContent = document.getElementById("mapContent");
+    const zoomInBtn = document.getElementById("zoomInBtn");
+    const zoomOutBtn = document.getElementById("zoomOutBtn");
+
+    const sosTopBtn = document.getElementById("sosTopBtn");
+    const sosMainBtn = document.getElementById("sosMainBtn");
+    const safetyModal = document.getElementById("safetyModal");
+    const safetyModalClose = document.getElementById("safetyModalClose");
+    const presetButtons = document.querySelectorAll(".preset-item");
+    const presetDisplay = document.getElementById("presetDisplay");
+
+    const uiLangSelect = document.getElementById("uiLangSelect");
+    const unitsSelect = document.getElementById("unitsSelect");
+    const batteryToggle = document.getElementById("batteryToggle");
+
+    const homeBtn = document.getElementById("homeBtn");
+    const backBtn = document.getElementById("backBtn");
+    const okBtn = document.getElementById("okBtn");
+
+    const volUpBtn = document.getElementById("volUpBtn");
+    const volDownBtn = document.getElementById("volDownBtn");
+    const powerBtn = document.getElementById("powerBtn");
+
+    // =========================
+    // Helpers: LED & Toast
+    // =========================
+    function setLed(color) {
+      statusLed.classList.remove("led-green", "led-blue", "led-red");
+      if (color === "green") statusLed.classList.add("led-green");
+      if (color === "blue") statusLed.classList.add("led-blue");
+      if (color === "red") statusLed.classList.add("led-red");
+    }
+
+    function showToast(message, duration = 2600) {
+      toastEl.textContent = message;
+      toastEl.classList.add("show");
+      if (toastTimeout) {
+        clearTimeout(toastTimeout);
+      }
+      toastTimeout = setTimeout(() => {
+        toastEl.classList.remove("show");
+      }, duration);
+    }
+
+    // =========================
+    // Time Display
+    // =========================
+    function updateTime() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, "0");
+      const m = String(now.getMinutes()).padStart(2, "0");
+      timeDisplay.textContent = `${h}:${m}`;
+    }
+    updateTime();
+    setInterval(updateTime, 30000);
+
+    // =========================
+    // Tabs & Hardware Navigation
+    // =========================
+    function switchTab(tabName) {
+      if (tabName === currentTab) return;
+      lastTab = currentTab;
+      currentTab = tabName;
+      tabs.forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.tab === tabName);
+      });
+      panels.forEach(panel => {
+        panel.classList.toggle("active", panel.id === `tab-${tabName}`);
+      });
+    }
+
+    tabs.forEach(btn => {
+      btn.addEventListener("click", () => {
+        switchTab(btn.dataset.tab);
+      });
+    });
+
+    homeBtn.addEventListener("click", () => {
+      switchTab("translate");
+      showToast("Home → Translate tab");
+    });
+
+    backBtn.addEventListener("click", () => {
+      if (safetyModal.classList.contains("active")) {
+        closeSafetyModal();
+        showToast("Closed SOS demo dialog");
+        setLed("green");
+        return;
+      }
+      if (lastTab && lastTab !== currentTab) {
+        const prev = lastTab;
+        lastTab = currentTab;
+        switchTab(prev);
+        showToast("Back to previous tab");
+      } else {
+        switchTab("translate");
+        showToast("Back → Translate tab");
+      }
+    });
+
+    okBtn.addEventListener("click", () => {
+      if (currentTab === "translate") {
+        triggerTranslation();
+      } else if (currentTab === "settings") {
+        saveSettings();
+      } else {
+        showToast("OK pressed (no special action here)");
+      }
+    });
+
+    // =========================
+    // Volume & Power (simulated)
+    // =========================
+    volUpBtn.addEventListener("click", () => {
+      showToast("Volume + (simulated)");
+    });
+    volDownBtn.addEventListener("click", () => {
+      showToast("Volume - (simulated)");
+    });
+    powerBtn.addEventListener("click", () => {
+      showToast("Power button pressed (device stays on in prototype)");
+    });
+
+    // =========================
+    // Translate: Language Swapping
+    // =========================
+    swapLangsBtn.addEventListener("click", () => {
+      const src = sourceLangSelect.value;
+      const tgt = targetLangSelect.value;
+      sourceLangSelect.value = tgt;
+      targetLangSelect.value = src;
+
+      if (currentSourceText || currentTranslatedText) {
+        const tmp = currentSourceText;
+        currentSourceText = currentTranslatedText;
+        currentTranslatedText = tmp;
+        updateTextBlocks();
+      }
+      showToast("Swapped source and target languages");
+    });
+
+    function updateTextBlocks() {
+      sourceTextEl.textContent = currentSourceText || "";
+      translatedTextEl.textContent = currentTranslatedText || "";
+
+      if (!currentSourceText) {
+        sourceTextEl.innerHTML = '<span class="text-placeholder">Tap the mic to speak, or type after prompt appears (if mic unsupported).</span>';
+      }
+      if (!currentTranslatedText) {
+        translatedTextEl.innerHTML = '<span class="text-placeholder">Translation will appear here using your local self‑hosted server.</span>';
+      }
+    }
+
+    // =========================
+    // Speech Recognition
+    // =========================
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognitionSupported = true;
+
+      recognition.addEventListener("start", () => {
+        recognitionListening = true;
+        recognitionHadResult = false;
+        micButton.classList.add("listening");
+        setLed("blue");
+        translateStatus.textContent = "Listening…";
+        showToast("Listening… speak clearly near your mic.");
+      });
+
+      recognition.addEventListener("result", (event) => {
+        recognitionHadResult = true;
+        const results = event.results;
+        const last = results[results.length - 1];
+        const transcript = last[0].transcript.trim();
+        if (transcript) {
+          currentSourceText = transcript;
+          updateTextBlocks();
+          translateStatus.textContent = "Captured speech. Translating…";
+          setLed("green");
+          triggerTranslation();
+        }
+      });
+
+      recognition.addEventListener("error", () => {
+        recognitionListening = false;
+        micButton.classList.remove("listening");
+        setLed("green");
+        translateStatus.textContent = "";
+        showToast("Speech recognition error. Try again.");
+      });
+
+      recognition.addEventListener("end", () => {
+        recognitionListening = false;
+        micButton.classList.remove("listening");
+        if (!recognitionHadResult) {
+          setLed("green");
+          if (!currentSourceText) {
+            translateStatus.textContent = "";
+            showToast("No speech detected.");
+          }
+        }
+      });
+    }
+
+    micButton.addEventListener("click", () => {
+      if (recognitionSupported) {
+        if (!recognitionListening) {
+          try {
+            const langName = sourceLangSelect.value;
+            const locale = languageLocaleMap[langName] || "en-IN";
+            recognition.lang = locale;
+          } catch {
+            recognition.lang = "en-IN";
+          }
+          recognition.start();
+        } else {
+          recognition.stop();
+        }
+      } else {
+        const text = window.prompt("Web Speech API not supported. Type the sentence to translate:");
+        if (text && text.trim()) {
+          currentSourceText = text.trim();
+          updateTextBlocks();
+          setLed("green");
+          translateStatus.textContent = "Text entered. Translating…";
+          triggerTranslation();
+        } else {
+          showToast("No text provided.");
+        }
+      }
+    });
+
+    // =========================
+    // Translation via Local API
+    // =========================
+    async function translateText(text, sourceLangName, targetLangName) {
+      const sourceCode = languageCodeMap[sourceLangName] || "auto";
+      const targetCode = languageCodeMap[targetLangName] || "en";
+
+      translateStatus.textContent = "Translating via local API…";
+      showToast("Translating… (local self-hosted server)");
+      // LED stays green; blue reserved for listening
+
+      try {
+        const response = await fetch("http://localhost:5000/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            q: text,
+            source: sourceCode,
+            target: targetCode,
+            format: "text"
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error("HTTP error " + response.status);
+        }
+
+        const data = await response.json();
+        const translated =
+          data.translatedText ||
+          data.translation ||
+          data.result ||
+          "";
+
+        if (!translated) {
+          throw new Error("No translated text in response");
+        }
+
+        currentTranslatedText = translated;
+        updateTextBlocks();
+        translateStatus.textContent = "Translation complete.";
+        showToast("Translation complete.");
+        setLed("green");
+      } catch (err) {
+        translateStatus.textContent = "";
+        setLed("red");
+        showToast("Translation failed (local API down?)");
+        setTimeout(() => setLed("green"), 1000);
+      }
+    }
+
+    function triggerTranslation() {
+      const text = currentSourceText.trim();
+      if (!text) {
+        showToast("No input text to translate.");
+        return;
+      }
+      const srcName = sourceLangSelect.value;
+      const tgtName = targetLangSelect.value;
+      const srcCode = languageCodeMap[srcName];
+      const tgtCode = languageCodeMap[tgtName];
+
+      // Guard: only allow translation if both languages are installed locally.
+      if (!installedLanguageCodes.has(srcCode) || !installedLanguageCodes.has(tgtCode)) {
+        showToast("This language pair is not installed on the local server yet.");
+        translateStatus.textContent = "";
+        return;
+      }
+
+      translateText(text, srcName, tgtName);
+    }
+
+    // =========================
+    // Text-to-Speech
+    // =========================
+    function speakText(text, locale) {
+      if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+        showToast("Speech synthesis not supported in this browser.");
+        return;
+      }
+      if (!text.trim()) {
+        showToast("No text to play.");
+        return;
+      }
+
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = locale || "en-IN";
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        showToast("Unable to start text-to-speech.");
+      }
+    }
+
+    playSourceBtn.addEventListener("click", () => {
+      if (!currentSourceText) {
+        showToast("Nothing to play in “You said”.");
+        return;
+      }
+      const langName = sourceLangSelect.value;
+      const locale = languageLocaleMap[langName] || "en-IN";
+      speakText(currentSourceText, locale);
+    });
+
+    playTargetBtn.addEventListener("click", () => {
+      if (!currentTranslatedText) {
+        showToast("Nothing to play in “Translated”.");
+        return;
+      }
+      const langName = targetLangSelect.value;
+      const locale = languageLocaleMap[langName] || "en-IN";
+      speakText(currentTranslatedText, locale);
+    });
+
+    // =========================
+    // Map Zoom
+    // =========================
+    function applyMapScale() {
+      mapContent.style.transform = `scale(${mapScale})`;
+    }
+    applyMapScale();
+
+    zoomInBtn.addEventListener("click", () => {
+      mapScale = Math.min(1.6, mapScale + 0.2);
+      applyMapScale();
+    });
+    zoomOutBtn.addEventListener("click", () => {
+      mapScale = Math.max(0.8, mapScale - 0.2);
+      applyMapScale();
+    });
+
+    // =========================
+    // Safety / SOS
+    // =========================
+    function openSafetyModal() {
+      safetyModal.classList.add("active");
+      setLed("red");
+      showToast("SOS demo only. No real emergency signals are sent.");
+    }
+
+    function closeSafetyModal() {
+      safetyModal.classList.remove("active");
+    }
+
+    sosTopBtn.addEventListener("click", openSafetyModal);
+    sosMainBtn.addEventListener("click", openSafetyModal);
+
+    safetyModalClose.addEventListener("click", () => {
+      closeSafetyModal();
+      setLed("green");
+    });
+
+    safetyModal.addEventListener("click", (e) => {
+      if (e.target === safetyModal) {
+        closeSafetyModal();
+        setLed("green");
+      }
+    });
+
+    presetButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const msg = btn.getAttribute("data-msg") || "";
+        presetDisplay.textContent = msg;
+        showToast(`Preset selected: ${msg}`);
+      });
+    });
+
+    // =========================
+    // Settings
+    // =========================
+    batteryToggle.addEventListener("click", () => {
+      batteryToggle.classList.toggle("on");
+    });
+
+    function saveSettings() {
+      settingsState.uiLang = uiLangSelect.value;
+      settingsState.units = unitsSelect.value;
+      settingsState.batterySaver = batteryToggle.classList.contains("on");
+      showToast("Settings saved (local state only).");
+    }
+
+    // =========================
+    // Initial LED & Text
+    // =========================
+    setLed("green");
+    updateTextBlocks();
+  </script>
+</body>
+</html>
